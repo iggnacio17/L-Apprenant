@@ -186,6 +186,24 @@ function spawnParticles(x, y, count, colors) {
   }
 }
 
+/* ──────────────── RIPPLE EFFECT ──────────────── */
+function addRipple(el, e) {
+  const rect = el.getBoundingClientRect();
+  const size = Math.max(rect.width, rect.height);
+  const x = (e ? e.clientX : rect.left + rect.width / 2) - rect.left - size / 2;
+  const y = (e ? e.clientY : rect.top + rect.height / 2) - rect.top - size / 2;
+  const ripple = document.createElement("span");
+  ripple.className = "ripple-el";
+  Object.assign(ripple.style, {
+    width: size + "px",
+    height: size + "px",
+    left: x + "px",
+    top: y + "px",
+  });
+  el.appendChild(ripple);
+  setTimeout(() => ripple.remove(), 500);
+}
+
 /* ──────────────── NAVEGACIÓN Y UI ──────────────── */
 function switchView(viewId, triggerEl = null) {
   SFX.tab();
@@ -343,12 +361,12 @@ function openLesson(id, e) {
   if (contentEl) contentEl.textContent = lesson.content;
 
   if (exList) {
-    exList.innerHTML = lesson.examples
+    exList.innerHTML = (lesson.examples || [])
       .map(
-        (ex) => `
-        <div class="example-item">
+        (ex, i) => `
+        <div class="example-item" data-num="${i + 1}">
           <p><strong>${ex.french}</strong></p>
-          <p class="text-dim"><em>${ex.spanish}</em></p>
+          <p>${ex.spanish}</p>
           ${ex.note ? `<span class="example-note">${ex.note}</span>` : ""}
         </div>
       `,
@@ -360,6 +378,25 @@ function openLesson(id, e) {
     tipsList.innerHTML = (lesson.tips || [])
       .map((tip) => `<li>${tip}</li>`)
       .join("");
+  }
+
+  // Inyectar card de pronunciación si existe
+  const existingPron = document.getElementById("pronunciationCard");
+  if (existingPron) existingPron.remove();
+  if (lesson.pronunciation) {
+    const pronCard = document.createElement("div");
+    pronCard.id = "pronunciationCard";
+    pronCard.className = "pronunciation-card";
+    pronCard.innerHTML = `
+      <div class="pronunciation-icon">🔊</div>
+      <div class="pronunciation-body">
+        <div class="pronunciation-label">Pronunciación</div>
+        <p class="pronunciation-text">${lesson.pronunciation}</p>
+      </div>
+    `;
+    // Insertar antes del footer
+    const footer = document.querySelector(".lesson-footer");
+    if (footer) footer.parentNode.insertBefore(pronCard, footer);
   }
 
   // Mostrar tab de lección y navegar
@@ -419,15 +456,16 @@ function renderVocab() {
         <p>${spanish}</p>
       </div>
     `;
-    card.addEventListener("click", () => {
+    card.addEventListener("click", (e) => {
       SFX.flip();
       card.classList.toggle("flipped");
       const rect = card.getBoundingClientRect();
+      const isFlipping = card.classList.contains("flipped");
       spawnParticles(
         rect.left + rect.width / 2,
         rect.top + rect.height / 2,
-        6,
-        COLORS.gold,
+        isFlipping ? 14 : 6,
+        isFlipping ? COLORS.gold : COLORS.mint,
       );
     });
     grid.appendChild(card);
@@ -518,8 +556,28 @@ document.addEventListener("DOMContentLoaded", () => {
   // Botones prev/next lección
   const prevBtn = document.getElementById("prevLessonBtn");
   const nextBtn = document.getElementById("nextLessonBtn");
-  if (prevBtn) prevBtn.addEventListener("click", () => navigateLesson(-1));
-  if (nextBtn) nextBtn.addEventListener("click", () => navigateLesson(1));
+  if (prevBtn)
+    prevBtn.addEventListener("click", (e) => {
+      navigateLesson(-1);
+      const rect = prevBtn.getBoundingClientRect();
+      spawnParticles(
+        rect.left + rect.width / 2,
+        rect.top + rect.height / 2,
+        8,
+        COLORS.indigo,
+      );
+    });
+  if (nextBtn)
+    nextBtn.addEventListener("click", (e) => {
+      navigateLesson(1);
+      const rect = nextBtn.getBoundingClientRect();
+      spawnParticles(
+        rect.left + rect.width / 2,
+        rect.top + rect.height / 2,
+        10,
+        COLORS.mint,
+      );
+    });
 
   // Guardar perfil
   const saveProfile = document.getElementById("saveProfile");
@@ -546,11 +604,18 @@ document.addEventListener("DOMContentLoaded", () => {
   // Filtros de nivel
   const filterBtns = document.querySelectorAll("#levelFilter .chip");
   filterBtns.forEach((btn) => {
-    btn.addEventListener("click", () => {
+    btn.addEventListener("click", (e) => {
       filterBtns.forEach((b) => b.classList.remove("active"));
       btn.classList.add("active");
       activeFilter = btn.dataset.value;
       SFX.tap();
+      const rect = btn.getBoundingClientRect();
+      spawnParticles(
+        rect.left + rect.width / 2,
+        rect.top + rect.height / 2,
+        8,
+        COLORS.mint,
+      );
       renderLessons();
     });
   });
@@ -574,6 +639,11 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     });
   }
+
+  // Ripple en botones
+  document.querySelectorAll(".btn").forEach((btn) => {
+    btn.addEventListener("click", (e) => addRipple(btn, e));
+  });
 
   // Hover SFX para tarjetas y tabs
   document.addEventListener("mouseover", (e) => {
